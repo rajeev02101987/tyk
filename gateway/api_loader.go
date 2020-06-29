@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -10,11 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/TykTechnologies/again"
-
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/playground"
 
@@ -671,7 +665,6 @@ func loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStor
 	}
 
 	router.Handle(chainObj.ListenOn, chainObj.ThisHandler)
-
 	return chainObj.ThisHandler
 }
 
@@ -771,7 +764,7 @@ func loadApps(specs []*APISpec) {
 		tmpSpecRegister[spec.APIID] = spec
 
 		switch spec.Protocol {
-		case "", "http", "https":
+		case "", "http", "https", "h2c":
 			if shouldTrace {
 				// opentracing works only with http services.
 				err := trace.AddTracer("", spec.Name)
@@ -781,37 +774,9 @@ func loadApps(specs []*APISpec) {
 					mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
 				}
 			}
-
 			tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
-
 		case "tcp", "tls":
 			loadTCPService(spec, &gs, muxer)
-
-		case "h2c":
-			//we want to have a proxy which can just be reached on root over http
-			//so lets just generate a listener and wrap the chain as the handler so we get middlewares etc
-			tmpSpecHandles.Store(spec.APIID, loadHTTPService(spec, apisByListen, &gs, muxer))
-			muxer.Lock()
-			muxer.again = again.New()
-			listener, err := muxer.generateListener(spec.ListenPort, spec.Protocol)
-			if err != nil {
-				mainLog.WithError(err).Error("Can't start listener")
-				continue
-			}
-
-			_, portS, _ := net.SplitHostPort(listener.Addr().String())
-			port, _ := strconv.Atoi(portS)
-			muxer.getProxy(spec.ListenPort).port = port
-			muxer.getProxy(spec.ListenPort).listener = listener
-			addr := config.Global().ListenAddress + ":" + strconv.Itoa(spec.ListenPort)
-			muxer.getProxy(spec.ListenPort).httpServer = &http.Server{
-				Addr:    addr,
-				Handler: h2c.NewHandler(loadHTTPService(spec, apisByListen, &gs, muxer), &http2.Server{}),
-			}
-			go muxer.getProxy(spec.ListenPort).httpServer.Serve(muxer.getProxy(spec.ListenPort).listener)
-			muxer.getProxy(spec.ListenPort).started = true
-
-			muxer.Unlock()
 		}
 	}
 
