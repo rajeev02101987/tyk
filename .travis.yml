@@ -1,6 +1,9 @@
 sudo: required
 language: go
 
+arch:
+  - arm64
+  - amd64
 notifications:
   on_success: never
   on_failure: always
