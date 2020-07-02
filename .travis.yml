@@ -18,7 +18,6 @@ addons:
   apt:
     packages:
     - python3-pip
-    - libluajit-5.1-dev
 
 matrix:
   include:
@@ -44,6 +43,7 @@ script:
   - pip3 install setuptools
   - sudo pip3 install google
   - sudo pip3 install protobuf
+  - sudo pip3 install luajit-dev
     ### Needed to convert the swagger 2.0 file to openapi 3.0
     ### The swagger docs are actually written as per the 2.0 spec as there is no
     ### support for openapi 3.0 in Go - at least for now.
